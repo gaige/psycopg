@@ -118,9 +118,10 @@ class AsyncCursor(BaseCursor["AsyncConnection[Any]", Row]):
                             self._executemany_gen_pipeline(query, params_seq, returning)
                         )
             else:
-                await self._conn.wait(
-                    self._executemany_gen_no_pipeline(query, params_seq, returning)
-                )
+                async with self._conn.lock:
+                    await self._conn.wait(
+                        self._executemany_gen_no_pipeline(query, params_seq, returning)
+                    )
         except e._NO_TRACEBACK as ex:
             raise ex.with_traceback(None)
 
@@ -215,6 +216,7 @@ class AsyncCursor(BaseCursor["AsyncConnection[Any]", Row]):
             yield row
 
     async def scroll(self, value: int, mode: str = "relative") -> None:
+        await self._fetch_pipeline()
         self._scroll(value, mode)
 
     @asynccontextmanager
